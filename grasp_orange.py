@@ -42,19 +42,20 @@ def stretch_hand():
     rightHand[11] = 495
     
     print("执行伸直动作...")
-    execute_action([10,8,6,4,2])
+    execute_action([2, 4, 6, 8, 9, 10, 11])
 
 # 定义抓握动作
 def grasp_hand():
     """抓握动作"""
-    rightHand[10] = 1000
-    rightHand[8] = 300
+    rightHand[9] = 268
+    rightHand[10] = 1013
+    rightHand[8] = 250
     rightHand[6] = 990
-    rightHand[4] = 130
-    rightHand[2] = 900
+    rightHand[4] = 82
+    rightHand[2] = 1018
     
     print("执行抓握动作...")
-    execute_action([10, 8, 6, 4, 2])
+    execute_action([9,2,10,4,6,8])
 
 # 执行动作
 def execute_action(id_list):
@@ -65,20 +66,20 @@ def execute_action(id_list):
             print("通信错误 ID %d: %s" % (id, packetHandler.getTxRxResult(scs_comm_result)))
         if scs_error != 0:
             print("舵机错误 ID %d: %s" % (id, packetHandler.getRxPacketError(scs_error)))
-        time.sleep(0.7)  # 等待舵机运动
+        time.sleep(0.5)  # 等待舵机运动
     print("动作完成")
 
-# 主程序 - 直接执行伸直动作
+# 主程序 - 直接执行抓握动作
 try:
     print("\n" + "="*40)
-    print("灵巧手伸直程序")
+    print("灵巧手抓握程序")
     print("端口: COM7, 波特率: 115200")
     print("="*40)
     
-    # 直接执行伸直动作
-    stretch_hand()
+    # 直接执行抓握动作
+    grasp_hand()
     
-    print("\n伸直动作已完成")
+    print("\n抓握动作已完成")
 
 except KeyboardInterrupt:
     print("\n程序被中断")

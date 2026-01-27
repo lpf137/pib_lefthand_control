@@ -77,11 +77,11 @@ class HandController:
 
     def grasp_hand(self):
         """抓握动作"""
-        self.rightHand[10] = 1000
+        self.rightHand[10] = 1013
         self.rightHand[8] = 250
         self.rightHand[6] = 990
-        self.rightHand[4] = 100
-        self.rightHand[2] = 980
+        self.rightHand[4] = 82
+        self.rightHand[2] = 1018
         
         print("执行抓握动作...")
         self.execute_action([8, 10, 6, 4, 2])
@@ -232,14 +232,14 @@ class SpatialVisualizer(dai.node.HostNode):
                                 
                                 # 移动手臂电机到抓取位置
                                 # Motor 0x4 -> 140度
-                                print("调整手臂电机: 0x4 -> 140°, 0x11 -> 50°")
+                                print("调整手臂电机: 0x4 -> 140°, 0x11 -> 45°")
                                 target_pos_4 = int((140 / 200.0) * 4095)
                                 driver.set_position(servo_id=self.motor_id_4, position=target_pos_4, 
                                                   time_ms=self.target_time_ms, speed=self.target_speed)
                                 time.sleep(0.05)
                                 
                                 # Motor 0x11 -> 50度
-                                target_pos_11 = int((50 / 200.0) * 4095)
+                                target_pos_11 = int((40 / 200.0) * 4095)
                                 driver.set_position(servo_id=self.motor_id_11, position=target_pos_11, 
                                                   time_ms=self.target_time_ms, speed=self.target_speed)
                                 time.sleep(0.5)
