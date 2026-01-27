@@ -1,0 +1,200 @@
+第一步：环境准备
+您需要一个 USB 转 TTL 模块连接电脑和电机。 安装 Python 串口库：
+pip install pyserial
+
+没问题！我已经仔细阅读了您上传的文件《TTL串口控制通信协议4095（25.10.13）.pdf》。
+
+这份文档详细定义了通信波特率（1Mbps）、指令包格式、校验和算法以及内存控制表。为了让您能够直接使用 Python 控制这 5 个电机，我为您编写了一个封装好的驱动类（Driver Class）。
+
+这个驱动程序解决了以下关键问题：
+
+
+协议封装：自动处理 0x12 0x4C 字头和校验和计算 。
+
+
+
+多机同步：实现了文档 1.4.5 节的 SYNCWRITE 指令，这是控制 5 个电机最有效的方式 。
+
+
+平滑控制：根据文档第 18 页的说明，通过设置“运行时间”来实现速度控制和平滑运动 。
+
+第一步：环境准备
+您需要一个 USB 转 TTL 模块连接电脑和电机。 安装 Python 串口库：
+
+Bash
+
+pip install pyserial
+第二步：驱动代码 (scservo.py)
+import serial
+import time
+
+class SCServo:
+    def __init__(self, port, baudrate=1000000):
+        # 文档说明波特率为 1Mbps
+        self.serial = serial.Serial(port, baudrate, timeout=0.1)
+        self.header = [0x12, 0x4C] # 文档定义的字头
+
+    def _calc_checksum(self, packet_content):
+        # 文档校验和算法: ~(ID + Length + Instruction + Params)
+        # packet_content 包含: ID, Length, Instruction, Params...
+        total = sum(packet_content)
+        return (~total) & 0xFF
+
+    def _send_packet(self, id, instruction, params):
+        length = len(params) + 2
+        # 包内容用于计算校验和: ID + Length + Instruction + Params
+        content_for_checksum = [id, length, instruction] + params
+        checksum = self._calc_checksum(content_for_checksum)
+        
+        # 最终发送的数据包: Header + Content + Checksum
+        packet = self.header + content_for_checksum + [checksum]
+        self.serial.write(bytearray(packet))
+
+    def _read_response(self, expected_len):
+        # 简单读取，实际应用可增加超时处理
+        if self.serial.in_waiting >= expected_len:
+            data = self.serial.read(expected_len)
+            return list(data)
+        return None
+
+    def close(self):
+        self.serial.close()
+
+    # ================= 核心功能 =================
+
+    def set_position(self, servo_id, position, time_ms=0, speed=0):
+        """
+        单电机控制 (文档 1.3.3 WRITE DATA) 
+        :param position: 0-4095
+        :param time_ms: 运行时间(ms)，用于控制平滑度 
+        """
+        position = max(0, min(4095, position))
+        
+        # 内存表地址 0x2A (42) 开始写入: 位置(2)+时间(2)+速度(2) 
+        # 虽然文档说速度指令可能被忽略，但为了格式对齐通常还是发满6字节
+        pos_h, pos_l = (position >> 8) & 0xFF, position & 0xFF
+        time_h, time_l = (time_ms >> 8) & 0xFF, time_ms & 0xFF
+        spd_h, spd_l = (speed >> 8) & 0xFF, speed & 0xFF
+
+        params = [0x2A, pos_h, pos_l, time_h, time_l, spd_h, spd_l]
+        self._send_packet(servo_id, 0x03, params) # 0x03 是 WRITE DATA 指令
+
+    def sync_write_pos(self, servo_pos_map, time_ms=0, speed=0):
+        """
+        多电机同步控制 (文档 1.4.5 SYNC WRITE) 
+        :param servo_pos_map: 字典 {id: position, id2: pos2...}
+        """
+        if not servo_pos_map:
+            return
+
+        # 参数构造: 写入首地址(0x2A) + 每个舵机的数据长度(6) 
+        params = [0x2A, 0x06]
+        
+        time_h, time_l = (time_ms >> 8) & 0xFF, time_ms & 0xFF
+        spd_h, spd_l = (speed >> 8) & 0xFF, speed & 0xFF
+
+        for servo_id, position in servo_pos_map.items():
+            position = max(0, min(4095, position))
+            pos_h, pos_l = (position >> 8) & 0xFF, position & 0xFF
+            
+            # 每个电机的参数段: ID + P_H + P_L + T_H + T_L + S_H + S_L
+            params.append(servo_id)
+            params.extend([pos_h, pos_l, time_h, time_l, spd_h, spd_l])
+
+        # 发送给广播 ID 0xFE, 指令 0x83 
+        self._send_packet(0xFE, 0x83, params)
+
+    def read_position(self, servo_id):
+        """
+        读取当前位置 (文档 1.3.2 READ DATA) 
+        """
+        self.serial.reset_input_buffer()
+        # 从地址 0x38 读取 2 个字节 
+        params = [0x38, 0x02]
+        self._send_packet(servo_id, 0x02, params)
+        
+        # 返回包长度: Header(2)+ID(1)+Len(1)+Err(1)+Param(2)+Sum(1) = 8字节
+        data = self._read_response(8)
+        if data and len(data) == 8:
+            # data[5] 是高位, data[6] 是低位 
+            return (data[5] << 8) | data[6]
+        return -1
+
+    第三步：控制逻辑 (main.py)
+这是您实际运行的文件。它演示了如何控制 5 个电机。
+from scservo import SCServo
+import time
+
+# 配置串口 (Windows: 'COMx', Mac/Linux: '/dev/ttyUSB0')
+# 请修改为您电脑实际的端口号
+PORT = 'COM3' 
+driver = SCServo(PORT)
+
+try:
+    print("连接成功，开始控制...")
+
+    # === 1. 单个电机测试 ===
+    # 控制 ID 1 移动到中间位置 2048，耗时 1秒
+    print("Moving ID 1...")
+    driver.set_position(servo_id=1, position=2048, time_ms=1000)
+    time.sleep(1.5) # 等待动作完成
+
+    # === 2. 读取位置反馈 ===
+    current_pos = driver.read_position(1)
+    print(f"ID 1 Current Position: {current_pos}")
+
+    # === 3. 五个电机同步控制 (核心需求) ===
+    # 假设您的电机 ID 是 1 到 5
+    ids = [1, 2, 3, 4, 5]
+    
+    # 动作 A: 所有电机归零
+    print("All Servos -> 0")
+    target_map_0 = {id: 0 for id in ids}
+    # 使用 sync_write_pos 一次性发送，保证绝对同步
+    driver.sync_write_pos(target_map_0, time_ms=2000) 
+    time.sleep(2.5)
+
+    # 动作 B: 设置不同位置 (模拟机械臂姿态)
+    print("All Servos -> Pose B")
+    target_map_pose = {
+        1: 1000,
+        2: 2048,
+        3: 3000,
+        4: 500,
+        5: 4095
+    }
+    # 1.5秒内平滑到达
+    driver.sync_write_pos(target_map_pose, time_ms=1500)
+    time.sleep(2)
+
+except Exception as e:
+    print(f"Error: {e}")
+
+finally:
+    driver.close()
+    print("Connection closed.")
+
+校验和计算 (_calc_checksum):
+
+代码严格遵循文档第 3 页的公式：~(ID + Length + Instruction + Params) 。
+
+平滑控制:
+
+我在 set_position 和 sync_write_pos 中都强制加入了 time_ms 参数。
+
+
+重要提示: 文档第 18 页明确指出 ：“采用时间控制的办法控制舵机的速度... 识别不了运行速度的指令”。
+
+因此，代码逻辑是将您想要的“速度”转化为“运行时间”写入地址 0x2C。time_ms 越大，动作越慢越平滑。
+
+同步写 (sync_write_pos):
+
+对应文档第 9-10 页的 SYNCWRITE (0x83) 。
+
+这对于多电机（如机械臂）至关重要，它能确保 5 个电机在同一毫秒启动，而不是一个接一个动。
+
+地址映射:
+
+目标位置写入地址：0x2A 。
+
+当前位置读取地址：0x38 。
