@@ -28,21 +28,39 @@ else:
     print("设置波特率失败")
     quit()
 
-rightHand = [0]*12  # 舵机位置列表，索引0-11对应舵机ID
+rightHand = [0]*32  # 覆盖右手与左手镜像所需的全部舵机ID
 
 # 定义伸直动作
 def stretch_hand():
     """伸直动作"""
-    rightHand[2] = 423
-    rightHand[4] = 596
-    rightHand[6] = 329
-    rightHand[8] = 810
-    rightHand[9] = 339
-    rightHand[10] = 633
-    rightHand[11] = 495
+    rightHand[1] = 491
+    rightHand[2] = 460
+    rightHand[3] = 474
+    rightHand[4] = 234
+    rightHand[5] = 491
+    rightHand[6] = 143
+    rightHand[7] = 474
+    rightHand[8] = 390
+    rightHand[9] = 271
+    rightHand[10] = 511
+    rightHand[11] = 406
+    rightHand[21] = 1021
+    rightHand[22] = 423
+    rightHand[23] = 0
+    rightHand[24] = 596
+    rightHand[25] = 1022
+    rightHand[26] = 329
+    rightHand[27] = 74
+    rightHand[28] = 810
+    rightHand[29] = 576
+    rightHand[30] = 633
+    rightHand[31] = 495
+    #rightHand舵机数字加20就是lefthand
+
     
     print("执行伸直动作...")
-    execute_action([10,8,6,4,2])
+    execute_action([11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21])
+
 
 # 定义抓握动作
 def grasp_hand():
@@ -65,7 +83,7 @@ def execute_action(id_list):
             print("通信错误 ID %d: %s" % (id, packetHandler.getTxRxResult(scs_comm_result)))
         if scs_error != 0:
             print("舵机错误 ID %d: %s" % (id, packetHandler.getRxPacketError(scs_error)))
-        time.sleep(0.7)  # 等待舵机运动
+        time.sleep(0.5)  # 等待舵机运动
     print("动作完成")
 
 # 主程序 - 直接执行伸直动作

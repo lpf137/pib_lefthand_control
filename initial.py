@@ -1,5 +1,5 @@
 # main.py
-from scservo_driver import SCServoDriver
+from arm_scservo_driver import SCServoDriver
 import time
 
 # 1. 实例化驱动 (根据实际情况修改端口号)
@@ -12,8 +12,13 @@ try:
     # === 参数配置 ===
     # 电机列表：ID和目标角度 (按ID从小到大排序)
     motor_commands = [
+        (0x10, 100),  # ID 0x10 -> 100度
+        (0x9, 90),  # ID 0x9 -> 115度
+        (0x6, 100),  # ID 0x6 -> 100度
+        (0x3, 90),  # ID 0x5 -> 100度
+        (0x2, 190),   # ID 0x4 -> 100度
         (0x12, 100),  # ID 0x12 -> 100度
-        (0x11, 100),  # ID 0x11 -> 100度
+        (0x11, 110),  # ID 0x11 -> 115度
         (0x8, 100),   # ID 0x8 -> 100度
         (0x7, 0),     # ID 0x7 -> 0度
         (0x4, 100),   # ID 0x4 -> 100度

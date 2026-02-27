@@ -1,5 +1,5 @@
 # main.py
-from scservo_driver import SCServoDriver
+from arm_scservo_driver import SCServoDriver
 import time
 
 # 1. 实例化驱动 (根据实际情况修改端口号)
@@ -10,9 +10,9 @@ try:
     print("开始控制...")
 
     # === 参数配置 ===
-    target_id = 0x8       # 目标电机 ID (十六进制0x8 = 十进制8)
-    target_angle = 95  # 目标角度 (0-200度)
-    target_time_ms = 1000  # 运行时间 (毫秒)，时间越长越慢
+    target_id = 0x10      # 目标电机 ID (十六进制0x8 = 十进制8)
+    target_angle = 20  # 目标角度 (0-200度)
+    target_time_ms = 500  # 运行时间 (毫秒)，时间越长越慢
     target_speed = 1000    # 运行速度 (某些电机需要此参数)
     # ================
 

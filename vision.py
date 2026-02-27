@@ -21,6 +21,12 @@ parser.add_argument(
     "--orangeMinConf", type=float, default=0.12, help="Minimum confidence for orange"
 )
 parser.add_argument(
+    "--birdMinConf", type=float, default=0.5, help="Minimum confidence for bird"
+)
+parser.add_argument(
+    "--ballMinConf", type=float, default=0.25, help="Minimum confidence for ball"
+)
+parser.add_argument(
     "--holdMs",
     type=int,
     default=450,
@@ -46,11 +52,13 @@ class SpatialVisualizer(dai.node.HostNode):
         dai.node.HostNode.__init__(self)
         self.sendProcessingToPipeline(True)
         # 只识别这些标签
-        self.target_labels = ["bottle", "orange"]
+        self.target_labels = ["bottle", "orange", "bird", "sports ball"]
         # 不同目标使用不同置信度阈值（橙子通常更容易掉到低置信度）
         self.min_conf_by_label = {
             "bottle": float(args.bottleMinConf),
             "orange": float(args.orangeMinConf),
+            "bird": float(args.birdMinConf), # 尝试用 bird 标签识别小黄鸭
+            "sports ball": float(args.ballMinConf), # 识别纸球
         }
 
         # 检测抖动时短暂保持上一帧目标框，避免“标签经常不显示”

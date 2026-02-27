@@ -9,7 +9,7 @@ from collections import deque
 import cv2
 import depthai as dai
 
-from scservo_driver import SCServoDriver
+from arm_scservo_driver import SCServoDriver
 
 # 添加 scservo_sdk 路径，用于灵巧手控制
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -22,6 +22,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--depthSource", type=str, default="stereo", choices=["stereo", "neural"])
 parser.add_argument("--bottleMinConf", type=float, default=0.25, help="Minimum confidence for bottle")
 parser.add_argument("--orangeMinConf", type=float, default=0.12, help="Minimum confidence for orange")
+parser.add_argument("--ballMinConf", type=float, default=0.25, help="Minimum confidence for ball")
 parser.add_argument(
     "--holdMs",
     type=int,
@@ -84,9 +85,9 @@ class HandController:
 
     def grasp_hand(self):
         self.rightHand[9] = 268
-        self.rightHand[10] = 1013
-        self.rightHand[8] = 250
-        self.rightHand[6] = 990
+        self.rightHand[10] = 1010
+        self.rightHand[8] = 203
+        self.rightHand[6] = 995
         self.rightHand[4] = 82
         self.rightHand[2] = 1018
         print("执行灵巧手抓握动作...")
@@ -105,8 +106,11 @@ class OrangeSpatialController(dai.node.HostNode):
         super().__init__()
         self.sendProcessingToPipeline(True)
 
-        self.target_labels = ["orange"]
-        self.min_conf_by_label = {"orange": float(args.orangeMinConf)}
+        self.target_labels = ["orange", "sports ball"]
+        self.min_conf_by_label = {
+            "orange": float(args.orangeMinConf),
+            "sports ball": float(args.ballMinConf),
+        }
         self.hold_seconds = max(0.0, float(args.holdMs) / 1000.0)
         self.last_seen = {}
 
@@ -189,12 +193,13 @@ class OrangeSpatialController(dai.node.HostNode):
                 if last and now - last["ts"] <= self.hold_seconds:
                     held_items.append(last)
 
-        self.update_motion(best_by_label.get("orange"))
+        target_item = best_by_label.get("orange") or best_by_label.get("sports ball")
+        self.update_motion(target_item)
 
         self.displayResults(rgbPreview, filtered_detections, held_items, below_threshold)
 
-    def update_motion(self, orange_detection):
-        if orange_detection is None:
+    def update_motion(self, target_detection):
+        if target_detection is None:
             self.orange_x_history.clear()
             self.reference_avg_x = None
             self.avg_stable_start = None
@@ -202,11 +207,12 @@ class OrangeSpatialController(dai.node.HostNode):
                 self.current_status = "Searching..."
             return
 
-        x_mm = float(orange_detection.spatialCoordinates.x)
+        x_mm = float(target_detection.spatialCoordinates.x)
         self.orange_x_history.append(x_mm)
         avg_x = sum(self.orange_x_history) / len(self.orange_x_history)
         smoothing_x = avg_x if len(self.orange_x_history) == self.orange_x_history.maxlen else x_mm
-        self.current_status = f"Orange X(avg10): {smoothing_x:.1f} mm"
+        label_name = target_detection.labelName
+        self.current_status = f"{label_name} X(avg10): {smoothing_x:.1f} mm"
 
         now = time.time()
         if now - self.last_motor_update >= self.motor_update_interval and not self.grasp_in_progress:
@@ -292,12 +298,31 @@ class OrangeSpatialController(dai.node.HostNode):
         height, width, _ = rgbFrame.shape
 
         orange_conf = 0.0
+        ball_conf = 0.0
         for det in detections:
             if det.labelName == "orange":
                 orange_conf = max(orange_conf, float(det.confidence))
+            elif det.labelName == "sports ball":
+                ball_conf = max(ball_conf, float(det.confidence))
+                
         for det in below_threshold:
             if det.labelName == "orange":
                 orange_conf = max(orange_conf, float(det.confidence))
+            elif det.labelName == "sports ball":
+                ball_conf = max(ball_conf, float(det.confidence))
+                
+        # Draw status
+        cv2.putText(rgbFrame, self.current_status, (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        cv2.putText(
+            rgbFrame,
+            f"orange conf: {orange_conf:.2f} ball: {ball_conf:.2f}",
+            (10, 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (0, 255, 255),
+            2,
+        )
 
         cv2.putText(
             rgbFrame,
